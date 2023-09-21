@@ -120,6 +120,17 @@ COPY server/exllama_kernels/ .
 # Build specific version of transformers
 RUN TORCH_CUDA_ARCH_LIST="8.0;8.6+PTX" python setup.py build
 
+
+# Build awq kernels
+FROM kernel-builder as awq-builder
+
+WORKDIR /usr/src
+
+COPY server/Makefile-awq Makefile
+
+RUN TORCH_CUDA_ARCH_LIST="8.0;8.6+PTX" make build-awq
+
+
 # Build Transformers CUDA kernels
 FROM kernel-builder as custom-kernels-builder
 
@@ -178,6 +189,9 @@ COPY --from=exllama-kernels-builder /usr/src/build/lib.linux-x86_64-cpython-39 /
 
 # Copy builds artifacts from vllm builder
 COPY --from=vllm-builder /usr/src/vllm/build/lib.linux-x86_64-cpython-39 /opt/conda/lib/python3.9/site-packages
+
+# Copy builds artifacts from awq builder
+COPY --from=awq-builder /usr/src/llm-awq/awq/kernels/build/lib.linux-x86_64-cpython-39 /opt/conda/lib/python3.9/site-packages
 
 # Install flash-attention dependencies
 RUN pip install einops --no-cache-dir
