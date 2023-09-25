@@ -151,9 +151,9 @@ class Weights:
             qzeros = self._get_qweight(f"{prefix}.qzeros") 
             scales = self._get_qweight(f"{prefix}.scales") 
             scales = scales.to(dtype=self.dtype)
-            try:
+            if quantize == "gptq":
                 g_idx = self.get_tensor(f"{prefix}.g_idx")
-            except RuntimeError:
+            else:
                 g_idx = None
 
             bits, groupsize = self._get_gptq_params()
@@ -201,12 +201,12 @@ class Weights:
                 [self.get_sharded(f"{p}.scales", dim=1) for p in prefixes], dim=1
             )
 
-            try:
+            if quantize == "gptq":
                 w = [self.get_tensor(f"{p}.g_idx") for p in prefixes]
                 for w2 in w[1:]:
                     torch.testing.assert_close(w2, w[0])
                 g_idx = w[0]
-            except RuntimeError:
+            else:
                 g_idx = None
 
             bits, groupsize = self._get_gptq_params()
@@ -287,10 +287,7 @@ class Weights:
                     scales = self.get_tensor(f"{prefix}.scales")
 
                 # For tp > 1, at this point we know we do not use act-order
-                if self.process_group.size() == 1:
-                    g_idx = self.get_tensor(f"{prefix}.g_idx")
-                else:
-                    g_idx = None
+                g_idx = self.get_tensor(f"{prefix}.g_idx")
             else:
                 # The triton kernel reorders the scales/zero points instead of the weight/activation.
                 # Thus, each rank needs the full qzeros/scales.
